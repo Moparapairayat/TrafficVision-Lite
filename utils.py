@@ -16,6 +16,9 @@ class FPSCounter:
     """Simple smoothed FPS calculator."""
 
     def __init__(self, smoothing=0.9):
+        if not 0 <= smoothing < 1:
+            raise ValueError("smoothing must be greater than or equal to 0 and less than 1")
+
         self.smoothing = smoothing
         self.previous_time = perf_counter()
         self.fps = 0.0
@@ -39,15 +42,31 @@ class FPSCounter:
 
 def save_screenshot(frame, screenshot_dir):
     """Save the current displayed frame with a timestamped filename."""
+    if frame is None:
+        raise OSError("Could not save screenshot: frame is empty.")
+
     ensure_directory(screenshot_dir)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     file_path = Path(screenshot_dir) / f"trafficvision_{timestamp}.jpg"
-    cv2.imwrite(str(file_path), frame)
+
+    try:
+        saved = cv2.imwrite(str(file_path), frame)
+    except cv2.error as error:
+        raise OSError(f"Could not save screenshot: {error}") from error
+
+    if not saved:
+        raise OSError(f"Could not save screenshot: {file_path}")
+
     return file_path
 
 
 def get_traffic_status(total_vehicles):
     """Return a friendly traffic status based on the total vehicle count."""
+    try:
+        total_vehicles = max(0, int(total_vehicles))
+    except (TypeError, ValueError):
+        total_vehicles = 0
+
     if total_vehicles <= 3:
         return "Light Traffic"
     if total_vehicles <= 8:
@@ -64,7 +83,10 @@ def count_vehicles(detections):
         "truck": 0,
     }
 
-    for detection in detections:
+    for detection in detections or []:
+        if not isinstance(detection, dict):
+            continue
+
         class_name = detection.get("class_name")
         if class_name in counts:
             counts[class_name] += 1

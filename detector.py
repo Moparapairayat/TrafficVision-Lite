@@ -21,6 +21,9 @@ class VehicleDetector:
 
     def detect(self, frame):
         """Return clean vehicle detections for one OpenCV frame."""
+        if frame is None:
+            return []
+
         results = self.model(
             frame,
             conf=self.confidence_threshold,
@@ -59,8 +62,12 @@ class VehicleDetector:
 
     def _class_name(self, class_id):
         if isinstance(self.class_names, dict):
-            return self.class_names.get(class_id, str(class_id))
-        return self.class_names[class_id]
+            return self.class_names.get(class_id) or self.class_names.get(str(class_id), str(class_id))
+
+        try:
+            return self.class_names[class_id]
+        except (IndexError, KeyError, TypeError):
+            return str(class_id)
 
     @staticmethod
     def _display_name(class_name):

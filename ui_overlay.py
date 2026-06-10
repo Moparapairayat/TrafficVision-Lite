@@ -174,8 +174,15 @@ def draw_bottom_analytics(frame, counts):
 
 
 def draw_vehicle_box(frame, detection):
-    x1, y1, x2, y2 = clamp_box(detection["bbox"], frame.shape)
-    class_name = detection["class_name"]
+    if not isinstance(detection, dict):
+        return
+
+    box = clamp_box(detection.get("bbox"), frame.shape)
+    if box is None:
+        return
+
+    x1, y1, x2, y2 = box
+    class_name = detection.get("class_name", "")
     color = COLORS.get(class_name, COLORS["panel_line"])
 
     draw_corner_box(frame, x1, y1, x2, y2, color)
@@ -231,6 +238,10 @@ def draw_detection_label(frame, x1, y1, detection, color):
         shift = label_x2 - frame_width + 1
         label_x1 = max(0, label_x1 - shift)
         label_x2 = frame_width - 1
+    if label_y2 > frame_height - 1:
+        shift = label_y2 - frame_height + 1
+        label_y1 = max(0, label_y1 - shift)
+        label_y2 = frame_height - 1
 
     cv2.rectangle(frame, (label_x1, label_y1), (label_x2, label_y2), (13, 18, 26), -1)
     cv2.rectangle(frame, (label_x1, label_y1), (label_x2, label_y2), color, 1, cv2.LINE_AA)
@@ -267,9 +278,25 @@ def darken(color, factor=0.45):
 
 def clamp_box(bbox, frame_shape):
     height, width = frame_shape[:2]
-    x1, y1, x2, y2 = bbox
+    try:
+        if bbox is None or len(bbox) != 4 or width <= 0 or height <= 0:
+            return None
+    except TypeError:
+        return None
+
+    try:
+        x1, y1, x2, y2 = bbox
+        x1, x2 = sorted((int(round(x1)), int(round(x2))))
+        y1, y2 = sorted((int(round(y1)), int(round(y2))))
+    except (TypeError, ValueError):
+        return None
+
     x1 = max(0, min(width - 1, x1))
     y1 = max(0, min(height - 1, y1))
     x2 = max(0, min(width - 1, x2))
     y2 = max(0, min(height - 1, y2))
+
+    if x2 <= x1 or y2 <= y1:
+        return None
+
     return x1, y1, x2, y2

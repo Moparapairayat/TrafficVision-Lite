@@ -28,6 +28,7 @@ def main():
 
     camera = cv2.VideoCapture(CAMERA_SOURCE)
     if not camera.isOpened():
+        camera.release()
         print("Could not open camera source.")
         print("Check CAMERA_SOURCE in config.py and make sure the camera or stream is available.")
         return
@@ -38,11 +39,16 @@ def main():
     try:
         while True:
             success, frame = camera.read()
-            if not success:
+            if not success or frame is None:
                 print("Could not read a frame from the camera source.")
                 break
 
-            detections = detector.detect(frame)
+            try:
+                detections = detector.detect(frame)
+            except Exception as error:
+                print(f"Detection failed: {error}")
+                break
+
             counts = count_vehicles(detections)
             total_vehicles = sum(counts.values())
             traffic_status = get_traffic_status(total_vehicles)
@@ -55,8 +61,12 @@ def main():
             if key in (ord("q"), ord("Q")):
                 break
             if key in (ord("s"), ord("S")):
-                screenshot_path = save_screenshot(display_frame, SCREENSHOT_DIR)
-                print(f"Screenshot saved: {screenshot_path}")
+                try:
+                    screenshot_path = save_screenshot(display_frame, SCREENSHOT_DIR)
+                except OSError as error:
+                    print(error)
+                else:
+                    print(f"Screenshot saved: {screenshot_path}")
     finally:
         camera.release()
         cv2.destroyAllWindows()
